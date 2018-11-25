@@ -3,7 +3,6 @@ extends KinematicBody2D
 # class member variables go here, for example:
 # var a = 2
 # var b = "textvar"
-
 #Variaveis da visao
 export (bool) var draw_line = false;
 var laser_color = Color(1.0, .329, .298)
@@ -12,14 +11,21 @@ var target
 var targets = []
 var hit_pos
 
+#objetos iniciais para serem desconsiderados no raycast
+#colocar principalmente objetos do player
+var ignore_rc
+
 #Variáveis da movimentação
 const BASE_SPD = 5
 #velocidade atual
 var p_speed
 var velocity = Vector2()
+var last_direction = Vector2(1, 0)
 
+var can_move = true
 
 func _ready():
+	ignore_rc = [self, get_node("Visao")]
 	p_speed = BASE_SPD
 	_child_ready()
 
@@ -34,7 +40,8 @@ func aim():
 	for t in targets:
 		show_enemy = false
 		var ignore = targets.duplicate()
-		ignore.append(self)
+		for i in ignore_rc:
+			ignore.append(i)
 		ignore.remove(ignore.find(t))
 		
 		var target_extents = t.get_node('CollisionShape2D').shape.extents - Vector2(5, 5)
@@ -79,31 +86,37 @@ func control(delta):
 		velocity = Vector2(speed_fx, velocity.y)
 		
 	velocity.normalized()
+	last_direction = velocity.normalized()
 	velocity *= delta
 	
 	
 func _physics_process(delta):
 	control(delta)
-	move_and_slide(velocity)
+	_child_physics(delta)
+	
+	if can_move:
+		move_and_slide(velocity)
 	if draw_line:
 		update()
 	if !targets.empty():
 		aim()
 	
+func _child_physics(delta):
+	pass
 	
 func _draw():
 	_child_draw()
 	if target:
 		for hit in hit_pos:
-			draw_circle((hit - position)*2, 5, laser_color)
-			draw_line(Vector2(), (hit - position)*2, laser_color)
+			draw_circle((hit - position), 5, laser_color)
+			draw_line(Vector2(), (hit - position), laser_color)
 		hit_pos = []
 		
 func _child_draw():
 	pass
 	
 #algum corpo entrou no campo de visão
-func _on_Visibility_body_entered(body):
+func _on_Visao_body_entered(body):
 	if targets.has(body):
 		return
 	if body.is_in_group("Hideable"):
@@ -111,7 +124,7 @@ func _on_Visibility_body_entered(body):
 		targets.append(body)
 
 #algum corpo saiu do campo de visão
-func _on_Visibility_body_exited(body):
+func _on_Visao_body_exited(body):
 	if targets.has(body):
 		body.setHide()
 		targets.remove(targets.find(body))
